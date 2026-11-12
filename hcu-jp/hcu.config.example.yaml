@@ -1,0 +1,50 @@
+# hcu.config.yaml にコピーして編集してください
+site:
+  title: hcu.jp
+  baseDomain: hcu.jp        # ポータル本体
+  scheme: https             # Cloudflare Tunnel 越しなら https
+  cookieDomain: .hcu.jp     # サブドメイン (router.hcu.jp 等) とログインを共有
+  sessionDays: 14
+
+# Wake-on-LAN の送信先 (自宅 LAN のブロードキャストアドレス)
+wol:
+  broadcast: 192.168.1.255
+  port: 9
+
+# 自宅のデバイス。id がそのままサブドメインになります (router → https://router.hcu.jp)
+# ログイン済みならワンクリックで管理画面に入れます。
+devices:
+  - id: router
+    name: ルーター
+    description: 自宅ルーターの管理画面
+    icon: router
+    target: http://192.168.1.1
+
+  - id: server
+    name: ローカルサーバ
+    description: Cockpit (サーバ管理)
+    icon: server
+    target: https://192.168.1.10:9090
+    insecure: true              # 自己署名証明書を許可
+    mac: "00:11:22:33:44:55"    # Wake-on-LAN ボタンを表示
+
+  - id: nas
+    name: NAS
+    description: ファイルサーバ
+    icon: hard-drive
+    target: http://192.168.1.20:5000
+
+# ブックマーク (旧サイトの Applications)
+links:
+  - group: Applications
+    items:
+      - name: いちぽる (PC 版)
+        description: UNIPA (いちぽる) のパソコン版サイトを開きます
+        url: https://ichipol.g.hiroshima-cu.ac.jp/uprx/ShibbolethAuthServlet
+        icon: graduation-cap
+        status: 公開中
+      - name: いちぽる (モバイル版)
+        description: UNIPA (いちぽる) のモバイル版サイトを開きます
+        url: https://ichipol.g.hiroshima-cu.ac.jp/uprx/MobileShibbolethAuthServlet
+        icon: smartphone
+        status: 公開中

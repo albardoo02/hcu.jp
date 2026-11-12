@@ -1,0 +1,20 @@
+# 自宅のサーバで:  docker compose up -d
+services:
+  hcu:
+    build: .
+    restart: unless-stopped
+    network_mode: host          # Wake-on-LAN のブロードキャストと LAN 内デバイスへのアクセスのため
+    environment:
+      HCU_CONFIG: /app/config/hcu.config.yaml
+      GITHUB_TOKEN: ${GITHUB_TOKEN}   # ポートフォリオのグラフ用 (.env に書く)
+    volumes:
+      - ./data:/app/data
+      - ./hcu.config.yaml:/app/config/hcu.config.yaml:ro
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    network_mode: host
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}   # .env に書く

@@ -1,0 +1,77 @@
+# hcu.config.yaml にコピーして編集してください
+site:
+  title: hcu.jp
+  baseDomain: hcu.jp        # ポータル本体
+  scheme: https             # Cloudflare Tunnel 越しなら https
+  cookieDomain: .hcu.jp     # サブドメイン (router.hcu.jp 等) とログインを共有
+  sessionDays: 14
+
+# Wake-on-LAN の送信先 (自宅 LAN のブロードキャストアドレス)
+wol:
+  broadcast: 192.168.1.255
+  port: 9
+
+# 自宅のデバイス。id がそのままサブドメインになります (router → https://router.hcu.jp)
+# ログイン済みならワンクリックで管理画面に入れます。
+devices:
+  - id: router
+    name: ルーター
+    description: 自宅ルーターの管理画面
+    icon: router
+    target: http://192.168.1.1
+
+  - id: server
+    name: ローカルサーバ
+    description: Cockpit (サーバ管理)
+    icon: server
+    target: https://192.168.1.10:9090
+    insecure: true              # 自己署名証明書を許可
+    mac: "00:11:22:33:44:55"    # Wake-on-LAN ボタンを表示
+
+  - id: nas
+    name: NAS
+    description: ファイルサーバ
+    icon: hard-drive
+    target: http://192.168.1.20:5000
+
+# ブックマーク (旧サイトの Applications)
+links:
+  - group: Applications
+    items:
+      - name: いちぽる (PC 版)
+        description: UNIPA (いちぽる) のパソコン版サイトを開きます
+        url: https://ichipol.g.hiroshima-cu.ac.jp/uprx/ShibbolethAuthServlet
+        icon: graduation-cap
+        status: 公開中
+      - name: いちぽる (モバイル版)
+        description: UNIPA (いちぽる) のモバイル版サイトを開きます
+        url: https://ichipol.g.hiroshima-cu.ac.jp/uprx/MobileShibbolethAuthServlet
+        icon: smartphone
+        status: 公開中
+
+# 短縮 URL (旧 .htaccess の Redirect permanent を移植)。hcu.jp/<キー> で 301 リダイレクト。ログイン不要。
+# Apache と同様に /pc/foo のような下位パスも転送先の末尾に付きます。
+redirects:
+  pc: https://ichipol.g.hiroshima-cu.ac.jp/uprx/ShibbolethAuthServlet
+  mobile: https://ichipol.g.hiroshima-cu.ac.jp/uprx/MobileShibbolethAuthServlet
+  pcr: http://165.242.90.60/~apc/r8/F/
+  en: https://yaruzo.gyuto-e.jp/hiroshima-cu/?classg=e-learning-4
+  app: https://script.google.com/a/macros/aks.hyogo-c.ed.jp/s/AKfycbwp0RTf9eJH9pBzyHbKZlrmzQsL0tUUJTmFowrRY860aoYohoTkh7DrNI7M8BpNncOFuA/exec
+
+# 未ログイン時に hcu.jp で表示するポートフォリオ
+# GitHub のコントリビューション等を表示するには環境変数 GITHUB_TOKEN が必要です
+# (fine-grained token、権限は「Public repositories (read-only)」だけで OK)
+portfolio:
+  github: albardoo02
+  timezone: Asia/Tokyo
+  about: |
+    古いリポジトリは大体動きません。
+    初心者の頃の思い出として公開しています。
+  org: AzisabaNetwork
+  promo:
+    title: アジ鯖で一緒に遊びませんか？
+    body: |
+      Minecraft サーバー「アジ鯖 (Azisaba Network)」でプラグイン開発をしています。
+      多彩なサーバーで遊べるので、ぜひ遊びに来てください！
+    address: azisaba.net
+    website: https://www.azisaba.net

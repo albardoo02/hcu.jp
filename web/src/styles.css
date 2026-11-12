@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Noto Sans JP", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --color-ink-950: #07070d;
+  --color-ink-900: #0d0d17;
+  --color-ink-800: #15151f;
+  --color-ink-700: #22222f;
+  --color-accent: #a78bfa;
+  --color-accent-2: #22d3ee;
+}
+
+html {
+  color-scheme: dark;
+  background: var(--color-ink-950);
+}
+body {
+  @apply min-h-dvh font-sans text-zinc-200 antialiased;
+  font-feature-settings: "palt";
+}
+
+/* 背景の光 */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.aurora::before,
+.aurora::after {
+  content: "";
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.22;
+  animation: drift 24s ease-in-out infinite alternate;
+}
+.aurora::before {
+  background: radial-gradient(circle, #7c3aed, transparent 65%);
+  top: -25vmax;
+  left: -15vmax;
+}
+.aurora::after {
+  background: radial-gradient(circle, #0891b2, transparent 65%);
+  bottom: -30vmax;
+  right: -20vmax;
+  animation-delay: -12s;
+}
+.grid-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at 50% 0%, black 30%, transparent 75%);
+}
+@keyframes drift {
+  to { transform: translate(8vmax, 6vmax) scale(1.1); }
+}
+
+.text-gradient {
+  background: linear-gradient(120deg, #c4b5fd, #67e8f9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility card {
+  @apply rounded-2xl border border-white/[0.07] bg-white/[0.025] backdrop-blur-xl transition;
+}
+@utility card-hover {
+  @apply hover:border-white/15 hover:bg-white/[0.045];
+}
+
+@utility input {
+  @apply w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-[15px] text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-violet-400/60 focus:ring-4 focus:ring-violet-500/15;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none;
+}
+@utility btn-primary {
+  @apply btn bg-gradient-to-r from-violet-500 to-cyan-500 text-white shadow-lg shadow-violet-500/20 hover:brightness-110;
+}
+@utility btn-ghost {
+  @apply btn border border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.07] hover:text-white;
+}
+
+@utility kbd {
+  @apply rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[11px] text-zinc-400;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.rise {
+  animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora::before, .aurora::after, .rise { animation: none; }
+}
+
+/* ポートフォリオ */
+.avatar-ring {
+  background: conic-gradient(from var(--a, 0deg), #a78bfa, #22d3ee, #34d399, #a78bfa);
+  animation: spin-ring 8s linear infinite;
+}
+@property --a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@keyframes spin-ring { to { --a: 360deg; } }
+
+.promo-bg {
+  background:
+    radial-gradient(ellipse at 0% 0%, rgb(16 185 129 / 0.22), transparent 55%),
+    radial-gradient(ellipse at 100% 100%, rgb(14 165 233 / 0.18), transparent 55%),
+    linear-gradient(180deg, #0b1512, #0a0f14);
+}
+.promo-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(to bottom, black, transparent);
+}
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  .avatar-ring { animation: none; }
+  html { scroll-behavior: auto; }
+}
