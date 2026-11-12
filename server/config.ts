@@ -83,7 +83,7 @@ function load(): Config {
     if (!/^[a-z0-9-]+$/.test(d.id)) throw new Error(`device id "${d.id}" はサブドメインとして使えません`);
   }
   console.log(`[config] ${path} を読み込みました (devices: ${devices.length})`);
-  const portfolio = { github: "albardoo02", timezone: "Asia/Tokyo", ...raw.portfolio };
+  const portfolio = { github: "albardoo02", timezone: "Asia/Tokyo", org: "AzisabaNetwork", ...raw.portfolio };
   const redirects = Object.fromEntries(
     Object.entries(raw.redirects ?? {}).map(([k, v]) => [k.toLowerCase().replace(/^\/+|\/+$/g, ""), String(v)]),
   );

@@ -19,6 +19,8 @@ export interface Repo {
 }
 export interface Portfolio {
   fetchedAt: string;
+  /** 取得中に起きた問題 (ログ・診断用) */
+  warnings?: string[];
   hasToken: boolean;
   profile: {
     login: string; name: string; avatar: string; url: string; bio: string | null;
@@ -51,6 +53,9 @@ const LANG_COLORS: Record<string, string> = {
 };
 const color = (name: string, c?: string | null) => c ?? LANG_COLORS[name] ?? "#8b8b9a";
 
+let warnings: string[] = [];
+function warn(m: string) { warnings.push(m); console.warn("[github]", m); }
+
 async function gh<T>(path: string): Promise<T> {
   const res = await fetch(`https://api.github.com${path}`, {
     headers: {
@@ -59,7 +64,11 @@ async function gh<T>(path: string): Promise<T> {
       ...(TOKEN ? { authorization: `Bearer ${TOKEN}` } : {}),
     },
   });
-  if (!res.ok) throw new Error(`GitHub ${path}: ${res.status}`);
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { message?: string };
+    const reset = res.headers.get("x-ratelimit-remaining") === "0" ? ` (レート制限: ${new Date(Number(res.headers.get("x-ratelimit-reset")) * 1000).toLocaleTimeString("ja-JP")} に解除)` : "";
+    throw new Error(`${path.split("?")[0]} → ${res.status} ${body.message ?? ""}${reset}`);
+  }
   return res.json() as Promise<T>;
 }
 
@@ -69,9 +78,12 @@ async function graphql<T>(query: string, variables: Record<string, unknown>): Pr
     headers: { authorization: `Bearer ${TOKEN}`, "content-type": "application/json", "user-agent": "hcu-portal" },
     body: JSON.stringify({ query, variables }),
   });
-  const json = (await res.json()) as { data?: T; errors?: { message: string }[] };
-  if (!res.ok || json.errors) throw new Error(`GraphQL: ${json.errors?.map((e) => e.message).join(", ") ?? res.status}`);
-  return json.data!;
+  const json = (await res.json().catch(() => ({}))) as { data?: T; errors?: { message: string; path?: string[] }[]; message?: string };
+  const msg = json.errors?.map((e) => `${e.path?.join(".") ?? ""} ${e.message}`.trim()).join(" / ") ?? json.message ?? `HTTP ${res.status}`;
+  if (!res.ok || !json.data) throw new Error(`GraphQL: ${msg}`);
+  // fine-grained token では一部フィールドだけ権限エラーになることがある → 取れた分は使う
+  if (json.errors) { warn(`GraphQL 一部失敗: ${msg}`); }
+  return json.data;
 }
 
 const USER_QUERY = `
@@ -158,30 +170,43 @@ async function commitHours(login: string): Promise<{ hours: number[]; sample: nu
     }
     return { hours, sample };
   } catch (e) {
-    console.warn("[github] commit hours:", (e as Error).message);
+    warn(`コミット時間帯の取得に失敗: ${(e as Error).message}`);
     return sample ? { hours, sample } : null;
   }
 }
 
 async function fetchOrg(login: string): Promise<Portfolio["org"]> {
+  let o: { login: string; name: string | null; description: string | null; avatar_url: string; html_url: string; blog: string | null; public_repos: number };
   try {
-    const [o, top] = await Promise.all([
-      gh<{ login: string; name: string | null; description: string | null; avatar_url: string; html_url: string; blog: string | null; public_repos: number }>(`/orgs/${login}`),
-      gh<{ items: RestRepo[] }>(`/search/repositories?q=org:${login}&sort=stars&order=desc&per_page=6`),
-    ]);
-    return {
-      login: o.login, name: o.name ?? o.login, description: o.description, avatar: o.avatar_url,
-      url: o.html_url, blog: o.blog || null, publicRepos: o.public_repos, topRepos: top.items.map(toRepo),
-    };
+    o = await gh(`/orgs/${login}`);
   } catch (e) {
-    console.warn("[github] org:", (e as Error).message);
+    warn(`組織 ${login} の取得に失敗: ${(e as Error).message}`);
     return null;
   }
+  let top: Repo[] = [];
+  try {
+    top = (await gh<{ items: RestRepo[] }>(`/search/repositories?q=org:${login}&sort=stars&order=desc&per_page=6`)).items.map(toRepo);
+  } catch (e) {
+    warn(`組織リポジトリ検索に失敗 (${(e as Error).message}) → 最近更新順で代用`);
+    try {
+      const repos = await gh<RestRepo[]>(`/orgs/${login}/repos?sort=pushed&per_page=30`);
+      top = repos.sort((a, b) => b.stargazers_count - a.stargazers_count).slice(0, 6).map(toRepo);
+    } catch (e2) { warn(`組織リポジトリ一覧も失敗: ${(e2 as Error).message}`); }
+  }
+  return {
+    login: o.login, name: o.name ?? o.login, description: o.description, avatar: o.avatar_url,
+    url: o.html_url, blog: o.blog || null, publicRepos: o.public_repos, topRepos: top,
+  };
 }
 
 async function fetchWithToken(login: string): Promise<Omit<Portfolio, "fetchedAt" | "org" | "commitHours" | "commitSample">> {
   const { user: u } = await graphql<GqlUser>(USER_QUERY, { login });
+  if (!u) throw new Error("GraphQL: user が取得できません");
   const cc = u.contributionsCollection;
+  if (!cc) throw new Error("GraphQL: contributionsCollection が取得できません");
+  u.repositories ??= { totalCount: 0, nodes: [] };
+  u.pinnedItems ??= { nodes: [] };
+  u.organizations ??= { nodes: [] };
 
   const byRepo = new Map<string, { color: string; value: number }>();
   for (const r of u.repositories.nodes) {
@@ -212,13 +237,13 @@ async function fetchWithToken(login: string): Promise<Omit<Portfolio, "fetchedAt
       commits: cc.totalCommitContributions + cc.restrictedContributionsCount,
       prs: cc.totalPullRequestContributions,
       issues: cc.totalIssueContributions,
-      contributedTo: u.repositoriesContributedTo.totalCount,
+      contributedTo: u.repositoriesContributedTo?.totalCount ?? null,
       contributions: cc.contributionCalendar.totalContributions,
     },
     calendar: cc.contributionCalendar.weeks.flatMap((w) => w.contributionDays.map((d) => ({ date: d.date, count: d.contributionCount }))),
     langsByRepo: topLangs(byRepo),
     langsByCommit: topLangs(byCommit),
-    pinned: u.pinnedItems.nodes.map((r) => ({
+    pinned: u.pinnedItems.nodes.filter(Boolean).map((r) => ({
       name: r.name, owner: r.owner.login, description: r.description, url: r.url, stars: r.stargazerCount,
       forks: r.forkCount, language: r.primaryLanguage ? { name: r.primaryLanguage.name, color: color(r.primaryLanguage.name, r.primaryLanguage.color) } : null,
     })),
@@ -262,12 +287,15 @@ let inflight: Promise<Portfolio> | null = null;
 
 async function refresh(): Promise<Portfolio> {
   const login = config.portfolio.github;
+  warnings = [];
+  if (!TOKEN) warn("GITHUB_TOKEN 未設定 → 公開情報のみ表示");
   const [main, hours, org] = await Promise.all([
-    TOKEN ? fetchWithToken(login).catch((e) => { console.warn("[github]", e.message, "→ REST にフォールバック"); return fetchPublic(login); }) : fetchPublic(login),
+    TOKEN ? fetchWithToken(login).catch((e) => { warn(`${e.message} → REST にフォールバック`); return fetchPublic(login); }) : fetchPublic(login),
     commitHours(login),
     config.portfolio.org ? fetchOrg(config.portfolio.org) : Promise.resolve(null),
   ]);
-  const data: Portfolio = { ...main, fetchedAt: new Date().toISOString(), commitHours: hours?.hours ?? null, commitSample: hours?.sample ?? 0, org };
+  if (config.portfolio.org && !org) warn("組織情報なし → 宣伝セクションは非表示");
+  const data: Portfolio = { ...main, fetchedAt: new Date().toISOString(), warnings: [...warnings], commitHours: hours?.hours ?? null, commitSample: hours?.sample ?? 0, org };
   cache = data;
   try {
     mkdirSync(dirname(CACHE_FILE), { recursive: true });
@@ -277,8 +305,12 @@ async function refresh(): Promise<Portfolio> {
 }
 
 /** キャッシュを即返し、古ければ裏で更新 (stale-while-revalidate) */
+export const refreshPortfolio = refresh;
+
 export async function getPortfolio(): Promise<Portfolio> {
-  const stale = !cache || Date.now() - Date.parse(cache.fetchedAt) > TTL;
+  // 何か失敗していたら 5 分後に再取得 (トークン未設定の警告だけなら通常どおり)
+  const partial = cache?.warnings?.some((w) => !w.startsWith("GITHUB_TOKEN 未設定"));
+  const stale = !cache || Date.now() - Date.parse(cache.fetchedAt) > (partial ? 5 * 60_000 : TTL);
   if (stale && !inflight) inflight = refresh().finally(() => { inflight = null; });
   if (cache) {
     inflight?.catch((e) => console.warn("[github] refresh failed:", e.message));
